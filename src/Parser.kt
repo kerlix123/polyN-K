@@ -101,7 +101,7 @@ class Parser(val tokens: List<Token>) {
 
         interpolation.parts.add(String_(tailToken))
 
-        return interpolations
+        return interpolation
     }
 
     private fun factor(): AST {
