@@ -1,0 +1,19 @@
+- class Solution [A]
+    A fun maxArea(list<int> height): int [B.]
+        B1 var max_area = 0
+        B2 var l = 0
+        B3 var r = height.length-1
+
+        B4 while (l < r) [C.]
+            C1 var min_height = height[l]
+            C2 if (min_height > height[r]) [D1]
+                D1 min_height = height[r]
+            C3 var area = min_height * (r-l)
+            C4 if (area > max_area) [D2]
+                D2 max_area = area
+            C5 if (height[l] > height[r]) [D3]
+                D3 r -= 1
+            C6 else [D4]
+                D4 l += 1
+
+        B5 return max_area

@@ -1,0 +1,68 @@
+variable: ID
+
+factor: INT_CONST
+      | REAL_CONST
+      | LPAREN logical_or RPAREN
+      | variable
+
+power: factor (POW unary)?
+
+unary: PLUS unary
+     | MINUS unary
+     | BITWISE_NOT unary
+     | power
+
+term: unary((MUL|FLOAT_DIV|INT_DIV|MODULO) unary)*
+
+expr: term((PLUS|MINUS) term)*
+
+shift: expr((LEFT_SHIFT|RIGHT_SHIFT) expr)*
+
+bitwise_and: shift(BITWISE_AND shift)*
+
+bitwise_xor: bitwise_and(BITWISE_XOR bitwise_and)*
+
+bitwise_or: bitwise_xor(BITWISE_OR bitwise_xor)*
+
+comparison: bitwise_or ((EQ|NOTEQ|GT|GTE|LT|LTE|IN) bitwise_or)*
+
+logical_not: NOT logical_not
+           | comparison
+
+logical_and: logical_not(AND logical_not)*
+
+logical_or: logical_and(OR logical_and)*
+
+program: statement (SEMI statement)* SEMI?
+
+statement: prefix statement_body
+
+prefix: ID | MINUS | QUESTION
+
+statement_body: declaration_statement
+              | assignment_statement
+              | print_statement
+              | empty
+
+declaration_statement: VAR variable ASSIGN logical_or
+
+assign_op: ASSIGN
+         | PLUS_ASSIGN
+         | MINUS_ASSIGN
+         | MUL_ASSIGN
+         | FLOAT_DIV_ASSIGN
+         | INT_DIV_ASSIGN
+         | MODULO_ASSIGN
+         | POW_ASSIGN
+         | BITWISE_AND_ASSIGN
+         | BITWISE_OR_ASSIGN
+         | BITWISE_XOR_ASSIGN
+         | LEFT_SHIFT_ASSIGN
+         | RIGHT_SHIFT_ASSIGN
+
+/* Using factor on the LHS allows x = 1, obj.prop = 1, and arr[0] = 1 */
+assignment_statement: factor assign_op logical_or
+
+print_statement: (PRINT | PRINTLN) LPAREN logical_or RPAREN
+
+empty:

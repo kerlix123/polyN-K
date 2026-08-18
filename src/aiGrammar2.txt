@@ -1,0 +1,144 @@
+program: line_list
+
+line_list: (line)*
+
+/* Top-level line execution */
+line: ID statement (SEMI)?
+
+statement: class_statement
+         | function_statement
+         | declaration_statement
+         | assignment_statement
+         | if_statement
+         | elif_statement
+         | else_statement
+         | for_statement
+         | while_statement
+         | return_statement
+         | break_statement
+         | continue_statement
+         | print_statement
+         | call_statement
+         | empty
+
+/* Declarations */
+class_statement: CLASS ID label_selector
+
+function_statement: FUN ID LPAREN parameter_list RPAREN (COLON type)? label_selector
+
+declaration_statement: VAR ID (COLON type)? ASSIGN logical_or
+
+return_statement: RETURN (logical_or)?
+
+break_statement: BREAK
+
+continue_statement: CONTINUE
+
+print_statement: (PRINT | PRINTLN) LPAREN argument_list RPAREN
+
+/* Assignments & Calls */
+assignment_statement: factor assign_op logical_or
+
+assign_op: ASSIGN
+         | PLUS_ASSIGN
+         | MINUS_ASSIGN
+         | MUL_ASSIGN
+         | FLOAT_DIV_ASSIGN
+         | INT_DIV_ASSIGN
+         | MODULO_ASSIGN
+         | POW_ASSIGN
+         | BITWISE_AND_ASSIGN
+         | BITWISE_OR_ASSIGN
+         | BITWISE_XOR_ASSIGN
+         | LEFT_SHIFT_ASSIGN
+         | RIGHT_SHIFT_ASSIGN
+
+call_statement: factor
+
+/* Control Flow */
+if_statement: IF LPAREN logical_or RPAREN label_selector
+
+elif_statement: ELIF LPAREN logical_or RPAREN label_selector
+
+else_statement: ELSE label_selector
+
+for_statement: FOR LPAREN ID IN logical_or RPAREN label_selector
+             | FOR LPAREN ID FROM logical_or TO logical_or RPAREN label_selector
+
+while_statement: WHILE LPAREN logical_or RPAREN label_selector
+
+/* Label Selectors */
+label_selector: LBRACKET pattern_list RBRACKET
+
+pattern_list: selector_pattern (AMPERSAND selector_pattern)*
+
+selector_pattern: ELLIPSIS ID
+                | ID DOT
+                | DOT ID
+                | ID
+
+/* Types & Parameters */
+type: ID (LT type (COMMA type)* GT)?
+
+parameter_list: (parameter (COMMA parameter)*)?
+
+parameter: type ID
+
+/* Expressions & Precedence */
+logical_or: logical_and (OR logical_and)*
+
+logical_and: logical_not (AND logical_not)*
+
+logical_not: NOT logical_not
+           | comparison
+
+comparison: bitwise_or ((EQ | NOTEQ | GT | GTE | LT | LTE | IN) bitwise_or)*
+
+bitwise_or: bitwise_xor (BITWISE_OR bitwise_xor)*
+
+bitwise_xor: bitwise_and (BITWISE_XOR bitwise_and)*
+
+bitwise_and: shift (BITWISE_AND shift)*
+
+shift: expr ((LEFT_SHIFT | RIGHT_SHIFT) expr)*
+
+expr: term ((PLUS | MINUS) term)*
+
+term: unary ((MUL | FLOAT_DIV | INT_DIV | MODULO) unary)*
+
+unary: PLUS unary
+     | MINUS unary
+     | BITWISE_NOT unary
+     | power
+
+power: factor (POW unary)?
+
+factor: primary ( DOT ID
+                | LBRACKET logical_or RBRACKET
+                | LPAREN argument_list RPAREN
+                )*
+
+generic_instantiation: ID LT type (COMMA type)* GT LPAREN argument_list RPAREN
+
+primary: INT_CONST
+       | REAL_CONST
+       | BOOL_CONST
+       | NULL
+       | STRING_CONST
+       | string_interpolation
+       | LPAREN logical_or RPAREN
+       | generic_instantiation
+       | variable
+
+variable: ID
+
+argument_list: (arg_element (COMMA arg_element)*)?
+
+arg_element: map_entry
+           | logical_or
+
+map_entry: logical_or COLON logical_or
+
+string_interpolation: STRING_HEAD logical_or (STRING_MID logical_or)* STRING_TAIL
+
+empty:

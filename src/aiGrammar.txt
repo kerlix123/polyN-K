@@ -1,0 +1,104 @@
+program: line_list
+
+line_list: (line)*
+
+/* Every line starts with a line label identifier */
+line: ID statement (SEMI)?
+
+statement: declaration_statement
+         | assignment_statement
+         | if_statement
+         | for_statement
+         | while_statement
+         | call_statement
+         | empty
+
+declaration_statement: VAR ID ASSIGN logical_or
+
+/* Factor on LHS enables: variable, obj.prop, or arr[idx] assignment */
+assignment_statement: factor assign_op logical_or
+
+assign_op: ASSIGN
+         | PLUS_ASSIGN
+         | MINUS_ASSIGN
+         | MUL_ASSIGN
+         | FLOAT_DIV_ASSIGN
+         | INT_DIV_ASSIGN
+         | MODULO_ASSIGN
+         | POW_ASSIGN
+         | BITWISE_AND_ASSIGN
+         | BITWISE_OR_ASSIGN
+         | BITWISE_XOR_ASSIGN
+         | LEFT_SHIFT_ASSIGN
+         | RIGHT_SHIFT_ASSIGN
+
+call_statement: factor
+
+/* Control Flow Statements */
+if_statement: IF LPAREN logical_or RPAREN label_selector
+             (ELIF LPAREN logical_or RPAREN label_selector)*
+             (ELSE label_selector)?
+
+for_statement: FOR LPAREN ID IN logical_or RPAREN label_selector
+             | FOR LPAREN ID FROM logical_or TO logical_or RPAREN label_selector
+
+while_statement: WHILE LPAREN logical_or RPAREN label_selector
+
+/* Bracketed Line Target Pattern Matching */
+label_selector: LBRACKET pattern_list RBRACKET
+
+pattern_list: selector_pattern (AMPERSAND selector_pattern)*
+
+selector_pattern: ELLIPSIS ID      /* ...line_name (Up to target line) */
+                | ID DOT          /* prefix.      (Starts with prefix) */
+                | DOT ID          /* .postfix     (Ends with postfix) */
+                | ID              /* Exact line label */
+
+/* Expressions & Precedence Chain */
+logical_or: logical_and (OR logical_and)*
+
+logical_and: logical_not (AND logical_not)*
+
+logical_not: NOT logical_not
+           | comparison
+
+comparison: bitwise_or ((EQ | NOTEQ | GT | GTE | LT | LTE | IN) bitwise_or)*
+
+bitwise_or: bitwise_xor (BITWISE_OR bitwise_xor)*
+
+bitwise_xor: bitwise_and (BITWISE_XOR bitwise_and)*
+
+bitwise_and: shift (BITWISE_AND shift)*
+
+shift: expr ((LEFT_SHIFT | RIGHT_SHIFT) expr)*
+
+expr: term ((PLUS | MINUS) term)*
+
+term: unary ((MUL | FLOAT_DIV | INT_DIV | MODULO) unary)*
+
+unary: PLUS unary
+     | MINUS unary
+     | BITWISE_NOT unary
+     | power
+
+power: factor (POW unary)?
+
+factor: primary ( DOT ID
+                | LBRACKET logical_or RBRACKET
+                | LPAREN argument_list RPAREN
+                )*
+
+primary: INT_CONST
+       | REAL_CONST
+       | STRING
+       | string_interpolation
+       | LPAREN logical_or RPAREN
+       | variable
+
+variable: ID
+
+argument_list: (logical_or (COMMA logical_or)*)?
+
+string_interpolation: STRING_HEAD logical_or (STRING_MID logical_or)* STRING_TAIL
+
+empty:

@@ -1,0 +1,16 @@
+C return false
+
+- class Solution [A]
+    A fun isPalindrome(int x): bool [B.]
+        B1 if (x < 0) [C]
+
+        B2 var div = 1
+        B3 while (x >= div * 10) [D]
+            D div *= 10
+
+        B4 while (x != 0) [E.]
+            E1 if (x // div != x % 10) [C]
+            E2 x = (x % div) // 10
+            E3 div /= 100
+
+        B5 return true

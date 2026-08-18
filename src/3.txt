@@ -1,0 +1,16 @@
+- class Solution [A]
+    A fun lengthOfLongestSubstring(string s): int [B.]
+        B1 var cSet = set<string>()
+        B2 var l = 0
+        B3 var res = 0
+
+        B4 for (r from 0 to s.length-1) [C.]
+            C1 while (s[r] in cSet) [D.]
+                D1 cSet.remove(s[l])
+                D2 l += 1
+            C2 cSet.add(s[r])
+            C3 var a = r - l + 1
+            C4 if (a > res) [E]
+                E res = a
+
+        B5 return res

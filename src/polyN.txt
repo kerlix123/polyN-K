@@ -1,0 +1,120 @@
+polyN
+
+**main syntax**
+    line_name function function_parameters;
+
+    default line_name = -
+
+**comments**
+    line_name = ?
+
+    ? This is polyN
+
+**variable declaration**
+    - var a = 5;
+
+**constant declaration**
+    - val a = 5;
+
+**data types**
+    int - whole number
+    float - real number
+    string - sequence of characters
+    bool - logic value
+    list
+    map
+    set
+    null
+
+**input**
+    - input data_type var_name
+
+    if variable doesn't exist it will be declared automatically
+
+**output**
+    - print("Hello, World");
+
+    - println("Hello, World");
+
+    output expression:
+        println(a + 3)
+
+    output expression in text:
+        println("Value: ${a + 3}")
+
+**if..else**
+    - if (condition1) lines_to_execute
+    - elif (condition2) lines_to_execute
+    - else lines_to_execute
+
+**lines_to_execute regex**
+    A - line A
+    A & B & ... - lines A, B and so on
+    ...A - all lines below the function until line with name A or the end of program
+    A. - all lines whose names start with A
+    .A - all lines whose names end with A
+
+**while**
+    - while (condition) lines_to_execute
+
+**for**
+    - for (variable from start to end) lines_to_execute
+
+    end is inclusive
+    if we want the loop to go backwards we use downTo instead of to
+
+    loop through list elements:
+        - for (element in list) lines_to_execute
+
+**arithmetic operators**
+    + - add
+    - - subtract
+    * - multiply
+    / - divide
+    // - integer div
+    ** - power
+    % - modulo
+
+**logical operators**
+    and
+    or
+    not
+
+**comparison operators**
+    == - equal
+    != - not equal
+    > - greater than
+    < - less than
+    >= - greater than or equal
+    <= - less than or equal
+
+**assignment operators**
+    =
+    +=
+    -=
+    *=
+    /=
+    //=
+    **=
+    %=
+    &=
+    |=
+    ^=
+    >>=
+    <<=
+
+**bitwise operators**
+    & - bitwise and
+    | - bitwise or
+    ^ - bitwise xor
+    ~ - bitwise not
+    << - left shift
+    >> - right shift
+
+**membership operator**
+    in
+
+**functions**
+    - fun (data_type parameter_name, ...): return_data_type line_names
+
+    return with return
