@@ -115,6 +115,6 @@ polyN
     in
 
 **functions**
-    - fun (data_type parameter_name, ...): return_data_type line_names
+    - fun name (data_type parameter_name, ...): return_data_type line_names
 
     return with return

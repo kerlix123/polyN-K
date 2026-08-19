@@ -1,1 +1,2 @@
-print((1 in {1, 2, 3}))
+def lele(a: int) -> int:
+	return (a + 5)

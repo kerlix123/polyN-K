@@ -7,7 +7,8 @@ class PythonTranspiler(val statements: List<Statement>) {
         TokenType.INT to "int",
         TokenType.FLOAT to "float",
         TokenType.STRING to "string",
-        TokenType.BOOL to "bool"
+        TokenType.BOOL to "bool",
+        TokenType.NULL to "None"
     )
 
     private val binaryOperators = mapOf(
@@ -85,6 +86,9 @@ class PythonTranspiler(val statements: List<Statement>) {
             is WhileStatement -> visitWhileStatement(node)
             is ForRangeStatement -> visitForRangeStatement(node)
             is ForEachStatement -> visitForEachStatement(node)
+            is FunParameter -> return visitFunParameter(node)
+            is FunStatement -> visitFunStatement(node)
+            is ReturnStatement -> return visitReturnStatement(node)
         }
         return ""
     }
@@ -175,7 +179,28 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitType(node: Type): String {
+        return when(node) {
+            is ScalarType -> visitScalarType(node)
+            is ListType -> visitListType(node)
+            is MapType -> visitMapType(node)
+            is SetType -> visitSetType(node)
+        }
+    }
+
+    fun visitScalarType(node: ScalarType): String {
         return types[node.token.type] ?: throw Exception("Unknown type")
+    }
+
+    fun visitListType(node: ListType): String {
+        return "list[${visit(node.type)}]"
+    }
+
+    fun visitMapType(node: MapType): String {
+        return "dict[${visit(node.keyType)}, ${visit(node.valueType)}]"
+    }
+
+    fun visitSetType(node: SetType): String {
+        return "set[${visit(node.type)}]"
     }
 
     fun visitVarDecl(node: VarDecl): String {
@@ -262,7 +287,39 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitForEachStatement(node: ForEachStatement) {
-        println("nig")
+        var result = ""
+        repeat(indent) { result += '\n' }
+        result += "for ${node.variable.value} in ${visit(node.list)}:"
+        program.add(result)
+
+        indent++
+        executeLines(node.exeStatement.lines)
+        indent--
+    }
+
+    fun visitFunParameter(node: FunParameter): String {
+        return "${visit(node.variable)}: ${visit(node.type)}"
+    }
+
+    fun visitFunStatement(node: FunStatement) {
+        var result = ""
+        repeat(indent) { result += '\t' }
+        result += "def ${node.name.value}("
+        for (i in node.parameters.indices) {
+            result += visit(node.parameters[i])
+            if (i != node.parameters.size - 1)
+                result += ", "
+        }
+        result += ") -> ${visit(node.returnType)}:"
+        program.add(result)
+
+        indent++
+        executeLines(node.exeStatement.lines)
+        indent--
+    }
+
+    fun visitReturnStatement(node: ReturnStatement): String {
+        return "return ${visit(node.value)}"
     }
 
     fun visitNoOp(): String {

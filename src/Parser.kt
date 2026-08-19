@@ -1,18 +1,24 @@
 sealed interface AST
+sealed interface Type: AST
 
 data class BinOp(val left: AST, val op: Token, val right: AST): AST
 data class UnaryOp(val op: Token, val expr: AST): AST
 data class Num(val token: Token, val value: String? = token.value): AST
 data class Bool(val token: Token, val value: String? = token.value): AST
 data object Null: AST
-data class List_(val type: Type, val elements: List<AST>): AST
+data class List_(val type: ListType, val elements: List<AST>): AST
 data class MapElement(val key: AST, val value: AST): AST
-data class Map_(val keyType: Type, val valueType: Type, val elements: List<MapElement>): AST
-data class Set_(val type: Type, val elements: List<AST>): AST
+data class Map_(val type: MapType, val elements: List<MapElement>): AST
+data class Set_(val type: SetType, val elements: List<AST>): AST
 data class String_(val token: Token, val value: String? = token.value): AST
 data class StringInterpolation(val parts: MutableList<AST> = mutableListOf<AST>()): AST
 data class Var(val token: Token, val value: String? = token.value): AST
-data class Type(val token: Token, val value: String? = token.value): AST
+
+data class ScalarType(val token: Token, val value: String? = token.value): Type
+data class ListType(val type: Type): Type
+data class MapType(val keyType: Type, val valueType: Type): Type
+data class SetType(val type: Type): Type
+
 data class VarDecl(val left: Var, val expr: AST): AST
 data class Assign(val left: Var, val op: Token, val right: AST): AST
 data class InputStatement(val type: Type, val variable: Var): AST
@@ -24,6 +30,9 @@ data class ElseStatement(val exeStatement: ExeStatement): AST
 data class WhileStatement(val expr: AST, val exeStatement: ExeStatement): AST
 data class ForRangeStatement(val variable: Var, var start: AST, val end: AST, val direction: String, val exeStatement: ExeStatement): AST
 data class ForEachStatement(val variable: Var, var list: AST, var exeStatement: ExeStatement): AST
+data class FunParameter(val type: Type, val variable: Var): AST
+data class FunStatement(val name: Var, val parameters: List<FunParameter>, val returnType: Type, val exeStatement: ExeStatement): AST
+data class ReturnStatement(val value: AST): AST
 data object NoOp: AST
 data class Statement(val lineName: Token, val statement: AST): AST
 
@@ -82,6 +91,23 @@ class Parser(val tokens: List<Token>) {
         return arguments
     }
 
+    private fun funParameter(): FunParameter {
+        val type = typeSpec()
+        val variable = variable()
+        return FunParameter(type, variable)
+    }
+
+    private fun parameterList(): List<FunParameter> {
+        val parameters = mutableListOf(funParameter())
+
+        while (currentToken.type == TokenType.COMMA) {
+            eat(TokenType.COMMA)
+            parameters.add(funParameter())
+        }
+
+        return parameters
+    }
+
     private fun mapElement(): MapElement {
         val key = logicalOr()
         eat(TokenType.TO)
@@ -106,12 +132,48 @@ class Parser(val tokens: List<Token>) {
         return Var(token)
     }
 
-    private fun typeSpec(): Type {
+    private fun scalarType(): ScalarType {
         val token = currentToken
-        if (token.type in setOf(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOL)) {
+        if (token.type in setOf(TokenType.INT, TokenType.FLOAT, TokenType.STRING, TokenType.BOOL, TokenType.NULL)) {
             eat(token.type)
         }
-        return Type(token)
+        return ScalarType(token)
+    }
+
+    private fun listType(): ListType {
+        eat(TokenType.LIST)
+        eat(TokenType.LBRACKET)
+        val type = typeSpec()
+        eat(TokenType.RBRACKET)
+        return ListType(type)
+    }
+
+    private fun mapType(): MapType {
+        eat(TokenType.MAP)
+        eat(TokenType.LBRACKET)
+        val keyType = typeSpec()
+        eat(TokenType.COMMA)
+        val valueType = typeSpec()
+        eat(TokenType.RBRACKET)
+        return MapType(keyType, valueType)
+    }
+
+    private fun setType(): SetType {
+        eat(TokenType.SET)
+        eat(TokenType.LBRACKET)
+        val type = typeSpec()
+        println(currentToken)
+        eat(TokenType.RBRACKET)
+        return SetType(type)
+    }
+
+    private fun typeSpec(): Type {
+        return when (currentToken.type) {
+            TokenType.LIST -> listType()
+            TokenType.MAP -> mapType()
+            TokenType.SET -> setType()
+            else -> scalarType()
+        }
     }
 
     private fun stringInterpolation(): StringInterpolation {
@@ -155,10 +217,7 @@ class Parser(val tokens: List<Token>) {
                 return Null
             }
             TokenType.LIST -> {
-                eat(TokenType.LIST)
-                eat(TokenType.LT)
-                val type = typeSpec()
-                eat(TokenType.GT)
+                val type = listType()
                 eat(TokenType.LPAREN)
                 var elements = emptyList<AST>()
                 if (currentToken.type != TokenType.RPAREN) {
@@ -168,24 +227,16 @@ class Parser(val tokens: List<Token>) {
                 return List_(type, elements)
             }
             TokenType.MAP -> {
-                eat(TokenType.MAP)
-                eat(TokenType.LT)
-                val keyType = typeSpec()
-                eat(TokenType.COMMA)
-                val valueType = typeSpec()
-                eat(TokenType.GT)
+                val type = mapType()
                 eat(TokenType.LPAREN)
                 var elements = emptyList<MapElement>()
                 if (currentToken.type != TokenType.RPAREN)
                     elements = mapElementList()
                 eat(TokenType.RPAREN)
-                return Map_(keyType, valueType, elements)
+                return Map_(type, elements)
             }
             TokenType.SET -> {
-                eat(TokenType.SET)
-                eat(TokenType.LT)
-                val type = typeSpec()
-                eat(TokenType.GT)
+                val type = setType()
                 eat(TokenType.LPAREN)
                 var elements = emptyList<AST>()
                 if (currentToken.type != TokenType.RPAREN) {
@@ -489,7 +540,6 @@ class Parser(val tokens: List<Token>) {
             return ForRangeStatement(variable, start, end, direction, ExeStatement(lines))
         } else if (currentToken.type == TokenType.IN) {
             eat(TokenType.IN)
-            //TODO - logicalOr?
             val list = logicalOr()
             eat(TokenType.RPAREN)
             eat(TokenType.LBRACKET)
@@ -499,6 +549,26 @@ class Parser(val tokens: List<Token>) {
         }
         error()
         return NoOp
+    }
+
+    private fun funStatement(): FunStatement {
+        eat(TokenType.FUN)
+        val name = variable()
+        eat(TokenType.LPAREN)
+        val parameters = parameterList()
+        eat(TokenType.RPAREN)
+        eat(TokenType.COLON)
+        val returnType = typeSpec()
+        eat(TokenType.LBRACKET)
+        val lines = getLines()
+        eat(TokenType.RBRACKET)
+        return FunStatement(name, parameters, returnType, ExeStatement(lines))
+    }
+
+    private fun returnStatement(): ReturnStatement {
+        eat(TokenType.RETURN)
+        val value = logicalOr()
+        return ReturnStatement(value)
     }
 
     private fun empty(): NoOp {
@@ -525,6 +595,8 @@ class Parser(val tokens: List<Token>) {
             TokenType.ELSE -> elseStatement()
             TokenType.WHILE -> whileStatement()
             TokenType.FOR -> forStatement()
+            TokenType.FUN -> funStatement()
+            TokenType.RETURN -> returnStatement()
             else -> empty()
         }
 
