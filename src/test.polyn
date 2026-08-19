@@ -1,3 +1,1 @@
-- println("${lrlr} ${jovan}");
-
-
+- println(1 in set<int>(1, 2, 3));

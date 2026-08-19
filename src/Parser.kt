@@ -3,6 +3,12 @@ sealed interface AST
 data class BinOp(val left: AST, val op: Token, val right: AST): AST
 data class UnaryOp(val op: Token, val expr: AST): AST
 data class Num(val token: Token, val value: String? = token.value): AST
+data class Bool(val token: Token, val value: String? = token.value): AST
+data object Null: AST
+data class List_(val type: Type, val elements: List<AST>): AST
+data class MapElement(val key: AST, val value: AST): AST
+data class Map_(val keyType: Type, val valueType: Type, val elements: List<MapElement>): AST
+data class Set_(val type: Type, val elements: List<AST>): AST
 data class String_(val token: Token, val value: String? = token.value): AST
 data class StringInterpolation(val parts: MutableList<AST> = mutableListOf<AST>()): AST
 data class Var(val token: Token, val value: String? = token.value): AST
@@ -18,7 +24,7 @@ data class ElseStatement(val exeStatement: ExeStatement): AST
 data class WhileStatement(val expr: AST, val exeStatement: ExeStatement): AST
 data class ForRangeStatement(val variable: Var, var start: AST, val end: AST, val direction: String, val exeStatement: ExeStatement): AST
 data class ForEachStatement(val variable: Var, var list: AST, var exeStatement: ExeStatement): AST
-data object NoOp : AST
+data object NoOp: AST
 data class Statement(val lineName: Token, val statement: AST): AST
 
 class Parser(val tokens: List<Token>) {
@@ -63,6 +69,35 @@ class Parser(val tokens: List<Token>) {
         }
 
         return lines
+    }
+
+    private fun argumentList(): List<AST> {
+        val arguments = mutableListOf(logicalOr())
+
+        while (currentToken.type == TokenType.COMMA) {
+            eat(TokenType.COMMA)
+            arguments.add(logicalOr())
+        }
+
+        return arguments
+    }
+
+    private fun mapElement(): MapElement {
+        val key = logicalOr()
+        eat(TokenType.TO)
+        val value = logicalOr()
+        return MapElement(key, value)
+    }
+
+    private fun mapElementList(): List<MapElement> {
+        val elements = mutableListOf(mapElement())
+
+        while (currentToken.type == TokenType.COMMA) {
+            eat(TokenType.COMMA)
+            elements.add(mapElement())
+        }
+
+        return elements
     }
 
     private fun variable(): Var {
@@ -110,6 +145,54 @@ class Parser(val tokens: List<Token>) {
             in setOf(TokenType.INT_CONST, TokenType.FLOAT_CONST) -> {
                 eat(token.type)
                 return Num(token)
+            }
+            TokenType.BOOL_CONST -> {
+                eat(TokenType.BOOL_CONST)
+                return Bool(token)
+            }
+            TokenType.NULL -> {
+                eat(TokenType.NULL)
+                return Null
+            }
+            TokenType.LIST -> {
+                eat(TokenType.LIST)
+                eat(TokenType.LT)
+                val type = typeSpec()
+                eat(TokenType.GT)
+                eat(TokenType.LPAREN)
+                var elements = emptyList<AST>()
+                if (currentToken.type != TokenType.RPAREN) {
+                    elements = argumentList()
+                }
+                eat(TokenType.RPAREN)
+                return List_(type, elements)
+            }
+            TokenType.MAP -> {
+                eat(TokenType.MAP)
+                eat(TokenType.LT)
+                val keyType = typeSpec()
+                eat(TokenType.COMMA)
+                val valueType = typeSpec()
+                eat(TokenType.GT)
+                eat(TokenType.LPAREN)
+                var elements = emptyList<MapElement>()
+                if (currentToken.type != TokenType.RPAREN)
+                    elements = mapElementList()
+                eat(TokenType.RPAREN)
+                return Map_(keyType, valueType, elements)
+            }
+            TokenType.SET -> {
+                eat(TokenType.SET)
+                eat(TokenType.LT)
+                val type = typeSpec()
+                eat(TokenType.GT)
+                eat(TokenType.LPAREN)
+                var elements = emptyList<AST>()
+                if (currentToken.type != TokenType.RPAREN) {
+                    elements = argumentList()
+                }
+                eat(TokenType.RPAREN)
+                return Set_(type, elements)
             }
             TokenType.STRING_CONST -> {
                 eat(TokenType.STRING_CONST)

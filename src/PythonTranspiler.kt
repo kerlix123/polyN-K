@@ -30,7 +30,8 @@ class PythonTranspiler(val statements: List<Statement>) {
         TokenType.LT to "<",
         TokenType.LTE to "<=",
         TokenType.AND to "and",
-        TokenType.OR to "or"
+        TokenType.OR to "or",
+        TokenType.IN to "in"
     )
 
     private val assignOperators = mapOf(
@@ -61,6 +62,12 @@ class PythonTranspiler(val statements: List<Statement>) {
             is BinOp -> return visitBinOp(node)
             is UnaryOp -> return visitUnaryOp(node)
             is Num -> return visitNum(node)
+            is Bool -> return visitBool(node)
+            is Null -> return visitNull()
+            is List_ -> return visitList(node)
+            is MapElement -> return visitMapElement(node)
+            is Map_ -> return visitMap(node)
+            is Set_ -> return visitSet(node)
             is String_ -> return visitString(node)
             is StringInterpolation -> return visitStringInterpolation(node)
             is Var -> return visitVar(node)
@@ -96,12 +103,71 @@ class PythonTranspiler(val statements: List<Statement>) {
         return node.value ?: ""
     }
 
+    fun visitBool(node: Bool): String {
+        return when (node.value) {
+            "true" -> "True"
+            "false" -> "False"
+            else -> ""
+        }
+    }
+
+    fun visitNull(): String = "None"
+
+    fun visitList(node: List_): String {
+        var result = "["
+
+        for (i in node.elements.indices) {
+            result += visit(node.elements[i])
+            if (i != node.elements.size - 1)
+                result += ", "
+        }
+
+        return "$result]"
+    }
+
+    fun visitMapElement(node: MapElement): String {
+        return "${visit(node.key)}: ${visit(node.value)}"
+    }
+
+    fun visitMap(node: Map_): String {
+        var result = "{"
+
+        for (i in node.elements.indices) {
+            result += visit(node.elements[i])
+            if (i != node.elements.size - 1)
+                result += ", "
+        }
+
+        return "$result}"
+    }
+
+    fun visitSet(node: Set_): String {
+        var result = "{"
+
+        for (i in node.elements.indices) {
+            result += visit(node.elements[i])
+            if (i != node.elements.size - 1)
+                result += ", "
+        }
+
+        return "$result}"
+    }
+
     fun visitString(node: String_): String {
         return "\"${node.value ?: ""}\""
     }
 
     fun visitStringInterpolation(node: StringInterpolation): String {
-        TODO("finish it up")
+        var string = "f\""
+        for (part in node.parts) {
+            string += if (part is String_) {
+                part.value
+            } else {
+                '{' + visit(part) + '}'
+            }
+        }
+        string += '\"'
+        return string
     }
 
     fun visitVar(node: Var): String {
@@ -222,6 +288,8 @@ class PythonTranspiler(val statements: List<Statement>) {
                         result += visit(lineNames[key] ?: throw Exception("No line named: $key"))
                         if (result != "")
                             program.add(result)
+                        result = ""
+                        repeat(indent) { result += '\t' }
                     }
                 }
             } else if (line.last() == '.') {
@@ -232,12 +300,16 @@ class PythonTranspiler(val statements: List<Statement>) {
                         result += visit(lineNames[key] ?: throw Exception("No line named: $key"))
                         if (result != "")
                             program.add(result)
+                        result = ""
+                        repeat(indent) { result += '\t' }
                     }
                 }
             } else {
                 result += visit(lineNames[line] ?: throw Exception("No line named: $line"))
                 if (result != "")
                     program.add(result)
+                result = ""
+                repeat(indent) { result += '\t' }
             }
         }
     }
