@@ -6,13 +6,17 @@ data class UnaryOp(val op: Token, val expr: AST): AST
 data class Num(val token: Token, val value: String? = token.value): AST
 data class Bool(val token: Token, val value: String? = token.value): AST
 data object Null: AST
-data class List_(val type: ListType, val elements: List<AST>): AST
+data class ListLiteral(val type: ListType, val elements: List<AST>): AST
 data class MapElement(val key: AST, val value: AST): AST
-data class Map_(val type: MapType, val elements: List<MapElement>): AST
-data class Set_(val type: SetType, val elements: List<AST>): AST
-data class String_(val token: Token, val value: String? = token.value): AST
+data class MapLiteral(val type: MapType, val elements: List<MapElement>): AST
+data class SetLiteral(val type: SetType, val elements: List<AST>): AST
+data class StringLiteral(val token: Token, val value: String? = token.value): AST
 data class StringInterpolation(val parts: MutableList<AST> = mutableListOf<AST>()): AST
 data class Var(val token: Token, val value: String? = token.value): AST
+data class IndexAccess(val target: AST, val index: AST) : AST
+data class MemberAccess(val target: AST, val member: Var) : AST
+data class MethodCall(val target: AST, val method: Var, val arguments: List<AST>) : AST
+data class FunctionCall(val callee: AST, val arguments: List<AST>) : AST // For standalone calls like fun()
 
 data class ScalarType(val token: Token, val value: String? = token.value): Type
 data class ListType(val type: Type): Type
@@ -20,7 +24,7 @@ data class MapType(val keyType: Type, val valueType: Type): Type
 data class SetType(val type: Type): Type
 
 data class VarDecl(val left: Var, val expr: AST): AST
-data class Assign(val left: Var, val op: Token, val right: AST): AST
+data class Assign(val left: AST, val op: Token, val right: AST): AST
 data class InputStatement(val type: Type, val variable: Var): AST
 data class PrintStatement(val token: Token, val expr: AST): AST
 data class ExeStatement(val lines: List<String>): AST
@@ -33,6 +37,7 @@ data class ForEachStatement(val variable: Var, var list: AST, var exeStatement: 
 data class FunParameter(val type: Type, val variable: Var): AST
 data class FunStatement(val name: Var, val parameters: List<FunParameter>, val returnType: Type, val exeStatement: ExeStatement): AST
 data class ReturnStatement(val value: AST): AST
+data class ExpressionStatement(val expr: AST) : AST
 data object NoOp: AST
 data class Statement(val lineName: Token, val statement: AST): AST
 
@@ -162,7 +167,6 @@ class Parser(val tokens: List<Token>) {
         eat(TokenType.SET)
         eat(TokenType.LBRACKET)
         val type = typeSpec()
-        println(currentToken)
         eat(TokenType.RBRACKET)
         return SetType(type)
     }
@@ -182,26 +186,26 @@ class Parser(val tokens: List<Token>) {
         val headToken = currentToken
         eat(TokenType.STRING_HEAD)
 
-        interpolation.parts.add(String_(headToken))
+        interpolation.parts.add(StringLiteral(headToken))
         interpolation.parts.add(logicalOr())
 
         while (currentToken.type == TokenType.STRING_MID) {
             val midToken = currentToken
             eat(TokenType.STRING_MID)
 
-            interpolation.parts.add(String_(midToken))
+            interpolation.parts.add(StringLiteral(midToken))
             interpolation.parts.add(logicalOr())
         }
 
         val tailToken = currentToken
         eat(TokenType.STRING_TAIL)
 
-        interpolation.parts.add(String_(tailToken))
+        interpolation.parts.add(StringLiteral(tailToken))
 
         return interpolation
     }
 
-    private fun factor(): AST {
+    private fun primary(): AST {
         val token = currentToken
         when (token.type) {
             in setOf(TokenType.INT_CONST, TokenType.FLOAT_CONST) -> {
@@ -224,7 +228,7 @@ class Parser(val tokens: List<Token>) {
                     elements = argumentList()
                 }
                 eat(TokenType.RPAREN)
-                return List_(type, elements)
+                return ListLiteral(type, elements)
             }
             TokenType.MAP -> {
                 val type = mapType()
@@ -233,7 +237,7 @@ class Parser(val tokens: List<Token>) {
                 if (currentToken.type != TokenType.RPAREN)
                     elements = mapElementList()
                 eat(TokenType.RPAREN)
-                return Map_(type, elements)
+                return MapLiteral(type, elements)
             }
             TokenType.SET -> {
                 val type = setType()
@@ -243,11 +247,11 @@ class Parser(val tokens: List<Token>) {
                     elements = argumentList()
                 }
                 eat(TokenType.RPAREN)
-                return Set_(type, elements)
+                return SetLiteral(type, elements)
             }
             TokenType.STRING_CONST -> {
                 eat(TokenType.STRING_CONST)
-                return String_(token)
+                return StringLiteral(token)
             }
             TokenType.STRING_HEAD -> {
                 return stringInterpolation()
@@ -262,6 +266,55 @@ class Parser(val tokens: List<Token>) {
                 return variable()
             }
         }
+    }
+
+    private fun factor(): AST {
+        var node = primary()
+
+        while (true) {
+            when (currentToken.type) {
+                // Indexing: arr[0]
+                TokenType.LBRACKET -> {
+                    eat(TokenType.LBRACKET)
+                    val index = logicalOr()
+                    eat(TokenType.RBRACKET)
+                    node = IndexAccess(node, index)
+                }
+
+                // Member access or Method call: obj.prop OR obj.method(...)
+                TokenType.DOT -> {
+                    eat(TokenType.DOT)
+                    val member = variable()
+
+                    if (currentToken.type == TokenType.LPAREN) {
+                        eat(TokenType.LPAREN)
+                        var args = emptyList<AST>()
+                        if (currentToken.type != TokenType.RPAREN) {
+                            args = argumentList()
+                        }
+                        eat(TokenType.RPAREN)
+                        node = MethodCall(node, member, args)
+                    } else {
+                        node = MemberAccess(node, member)
+                    }
+                }
+
+                // Direct call on variable or expression: fn()
+                TokenType.LPAREN -> {
+                    eat(TokenType.LPAREN)
+                    var args = emptyList<AST>()
+                    if (currentToken.type != TokenType.RPAREN) {
+                        args = argumentList()
+                    }
+                    eat(TokenType.RPAREN)
+                    node = FunctionCall(node, args)
+                }
+
+                else -> break
+            }
+        }
+
+        return node
     }
 
     private fun power(): AST {
@@ -427,17 +480,38 @@ class Parser(val tokens: List<Token>) {
         return VarDecl(left, expr)
     }
 
-    private fun assignmentStatement(): Assign {
-        val left = variable()
-        val token = currentToken
+    private val assignmentOps = setOf(
+        TokenType.ASSIGN,
+        TokenType.PLUS_ASSIGN,
+        TokenType.MINUS_ASSIGN,
+        TokenType.MUL_ASSIGN,
+        TokenType.FLOAT_DIV_ASSIGN,
+        TokenType.INT_DIV_ASSIGN,
+        TokenType.MODULO_ASSIGN,
+        TokenType.POW_ASSIGN,
+        TokenType.BITWISE_AND_ASSIGN,
+        TokenType.BITWISE_OR_ASSIGN,
+        TokenType.BITWISE_XOR_ASSIGN,
+        TokenType.LEFT_SHIFT_ASSIGN,
+        TokenType.RIGHT_SHIFT_ASSIGN
+    )
 
-        if (token.type in setOf(TokenType.ASSIGN, TokenType.PLUS_ASSIGN, TokenType.MINUS_ASSIGN, TokenType.MUL_ASSIGN, TokenType.FLOAT_DIV_ASSIGN, TokenType.INT_DIV_ASSIGN, TokenType.MODULO_ASSIGN, TokenType.POW_ASSIGN, TokenType.BITWISE_AND_ASSIGN, TokenType.BITWISE_OR_ASSIGN, TokenType.BITWISE_XOR_ASSIGN, TokenType.LEFT_SHIFT_ASSIGN, TokenType.RIGHT_SHIFT_ASSIGN)) {
-            eat(token.type)
-        } else {
-            error()
+    private fun expressionOrAssignmentStatement(): AST {
+        val expr = logicalOr()
+
+        if (currentToken.type in assignmentOps) {
+            val opToken = currentToken
+            eat(opToken.type)
+            val right = logicalOr()
+
+            if (expr !is Var && expr !is IndexAccess && expr !is MemberAccess) {
+                throw Exception("Invalid assignment target")
+            }
+
+            return Assign(left = expr, op = opToken, right = right)
         }
 
-        return Assign(left, token, logicalOr())
+        return ExpressionStatement(expr)
     }
 
     private fun inputStatement(): InputStatement {
@@ -586,7 +660,6 @@ class Parser(val tokens: List<Token>) {
 
         val statement = when (currentToken.type) {
             TokenType.VAR -> declarationStatement()
-            TokenType.ID -> assignmentStatement()
             TokenType.INPUT -> inputStatement()
             in setOf(TokenType.PRINT, TokenType.PRINTLN) -> printStatement()
             TokenType.EXE -> exeStatement()
@@ -597,7 +670,7 @@ class Parser(val tokens: List<Token>) {
             TokenType.FOR -> forStatement()
             TokenType.FUN -> funStatement()
             TokenType.RETURN -> returnStatement()
-            else -> empty()
+            else -> expressionOrAssignmentStatement()
         }
 
         eat(TokenType.SEMI)

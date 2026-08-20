@@ -2,7 +2,7 @@ class Lexer(private val text: String) {
     private var pos = 0
     private var currentChar: Char? = text[pos]
 
-    private var RESERVED_KEYWORDS = mapOf(
+    private var reservedKeywords = mapOf(
         "int" to Token(TokenType.INT),
         "float" to Token(TokenType.FLOAT),
         "string" to Token(TokenType.STRING),
@@ -101,12 +101,12 @@ class Lexer(private val text: String) {
             advance()
         }
 
-        return RESERVED_KEYWORDS.getOrDefault(identifier, Token(TokenType.ID, identifier))
+        return reservedKeywords.getOrDefault(identifier, Token(TokenType.ID, identifier))
     }
 
     private fun makeString(): List<Token> {
         val tokens = mutableListOf<Token>()
-        advance() // Consume opening quote '"'
+        advance()
 
         var hasInterpolation = false
         val currentText = StringBuilder()
@@ -175,7 +175,7 @@ class Lexer(private val text: String) {
             error("Unterminated string literal")
         }
 
-        advance() // Consume closing quote '"'
+        advance()
 
         val finalVal = currentText.toString()
         if (hasInterpolation) {

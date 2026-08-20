@@ -65,13 +65,17 @@ class PythonTranspiler(val statements: List<Statement>) {
             is Num -> return visitNum(node)
             is Bool -> return visitBool(node)
             is Null -> return visitNull()
-            is List_ -> return visitList(node)
+            is ListLiteral -> return visitList(node)
             is MapElement -> return visitMapElement(node)
-            is Map_ -> return visitMap(node)
-            is Set_ -> return visitSet(node)
-            is String_ -> return visitString(node)
+            is MapLiteral -> return visitMap(node)
+            is SetLiteral -> return visitSet(node)
+            is StringLiteral -> return visitString(node)
             is StringInterpolation -> return visitStringInterpolation(node)
             is Var -> return visitVar(node)
+            is IndexAccess -> return visitIndexAccess(node)
+            is MemberAccess -> return visitMemberAccess(node)
+            is MethodCall -> return visitMethodCall(node)
+            is FunctionCall -> return visitFunctionCall(node)
             is Type -> return visitType(node)
             is VarDecl -> return  visitVarDecl(node)
             is Assign -> return visitAssign(node)
@@ -89,6 +93,7 @@ class PythonTranspiler(val statements: List<Statement>) {
             is FunParameter -> return visitFunParameter(node)
             is FunStatement -> visitFunStatement(node)
             is ReturnStatement -> return visitReturnStatement(node)
+            is ExpressionStatement -> return visitExpressionStatement(node)
         }
         return ""
     }
@@ -117,7 +122,7 @@ class PythonTranspiler(val statements: List<Statement>) {
 
     fun visitNull(): String = "None"
 
-    fun visitList(node: List_): String {
+    fun visitList(node: ListLiteral): String {
         var result = "["
 
         for (i in node.elements.indices) {
@@ -133,7 +138,7 @@ class PythonTranspiler(val statements: List<Statement>) {
         return "${visit(node.key)}: ${visit(node.value)}"
     }
 
-    fun visitMap(node: Map_): String {
+    fun visitMap(node: MapLiteral): String {
         var result = "{"
 
         for (i in node.elements.indices) {
@@ -145,7 +150,7 @@ class PythonTranspiler(val statements: List<Statement>) {
         return "$result}"
     }
 
-    fun visitSet(node: Set_): String {
+    fun visitSet(node: SetLiteral): String {
         var result = "{"
 
         for (i in node.elements.indices) {
@@ -157,14 +162,14 @@ class PythonTranspiler(val statements: List<Statement>) {
         return "$result}"
     }
 
-    fun visitString(node: String_): String {
+    fun visitString(node: StringLiteral): String {
         return "\"${node.value ?: ""}\""
     }
 
     fun visitStringInterpolation(node: StringInterpolation): String {
         var string = "f\""
         for (part in node.parts) {
-            string += if (part is String_) {
+            string += if (part is StringLiteral) {
                 part.value
             } else {
                 '{' + visit(part) + '}'
@@ -176,6 +181,37 @@ class PythonTranspiler(val statements: List<Statement>) {
 
     fun visitVar(node: Var): String {
         return node.value ?: ""
+    }
+
+    fun visitIndexAccess(node: IndexAccess): String {
+        return "${visit(node.target)}[${visit(node.index)}]"
+    }
+
+    fun visitMemberAccess(node: MemberAccess): String {
+        // TODO - handle member access for different types of objects
+        if (node.member.value == "size") {
+            return "len(${visit(node.target)})"
+        }
+
+        return ""
+    }
+
+    fun visitMethodCall(node: MethodCall): String {
+        // TODO - handle method calls for different types of objects
+        println(node)
+        return ""
+    }
+
+    fun visitFunctionCall(node: FunctionCall): String {
+        var result = "${visit(node.callee)}("
+
+        for (i in node.arguments.indices) {
+            result += visit(node.arguments[i])
+            if (i != node.arguments.size - 1)
+                result += ", "
+        }
+
+        return "$result)"
     }
 
     fun visitType(node: Type): String {
@@ -209,7 +245,7 @@ class PythonTranspiler(val statements: List<Statement>) {
 
     fun visitAssign(node: Assign): String {
         val op = assignOperators[node.op.type] ?: throw Exception("Unsupported assign operator: ${node.op.type}")
-        return "${node.left.value} $op ${visit(node.right)}"
+        return "${visit(node.left)} $op ${visit(node.right)}"
     }
 
     fun visitPrintStatement(node: PrintStatement): String {
@@ -270,13 +306,13 @@ class PythonTranspiler(val statements: List<Statement>) {
 
     fun visitForRangeStatement(node: ForRangeStatement) {
         var result = ""
-        repeat(indent) { result += '\n' }
+        repeat(indent) { result += '\t' }
         val start = visit(node.start)
-        var end = visit(node.end).toInt()
+        var end = visit(node.end)
         if (node.direction == "ASC") {
-            end++
+            end += "+ 1"
         } else {
-            end--
+            end += "- 1"
         }
         result += "for ${node.variable.value} in range(${start}, ${end}, ${if (node.direction == "ASC") 1 else -1}):"
         program.add(result)
@@ -320,6 +356,10 @@ class PythonTranspiler(val statements: List<Statement>) {
 
     fun visitReturnStatement(node: ReturnStatement): String {
         return "return ${visit(node.value)}"
+    }
+
+    fun visitExpressionStatement(node: ExpressionStatement): String {
+        return visit(node.expr)
     }
 
     fun visitNoOp(): String {
