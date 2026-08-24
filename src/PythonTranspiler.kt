@@ -1,7 +1,27 @@
 class PythonTranspiler(val statements: List<Statement>) {
-    val lineNames = mutableMapOf<String, AST>()
-    var program = mutableListOf<String>()
-    var indent = 0
+    private val symbolTable = SymbolTable()
+
+    private fun typeOf(node: AST): Type? {
+        return when (node) {
+            is Num -> {
+                val tokenType = if (node.value?.contains('.') == true) TokenType.FLOAT else TokenType.INT
+                ScalarType(Token(tokenType, node.value))
+            }
+            is Bool -> ScalarType(Token(TokenType.BOOL, "bool"))
+            is StringLiteral, is StringInterpolation -> ScalarType(Token(TokenType.STRING, "string"))
+            is ListLiteral -> node.type
+            is MapLiteral -> node.type
+            is SetLiteral -> node.type
+            is Var -> symbolTable.lookup(node.value ?: "")
+            is BinOp -> typeOf(node.left) // Simplified: assumes operation preserves left operand type
+            is FunctionCall -> symbolTable.lookup(visit(node.callee))
+            else -> null
+        }
+    }
+
+    private val lineNames = mutableMapOf<String, AST>()
+    private var program = mutableListOf<String>()
+    private var indent = 0
 
     private val types = mapOf(
         TokenType.INT to "int",
@@ -188,18 +208,60 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitMemberAccess(node: MemberAccess): String {
-        // TODO - handle member access for different types of objects
-        if (node.member.value == "size") {
-            return "len(${visit(node.target)})"
-        }
+        val targetType = typeOf(node.target)
+        val memberName = node.member.value
+        val targetCode = visit(node.target)
 
-        return ""
+        return when (targetType) {
+            is ListType -> when (memberName) {
+                "size" -> "len($targetCode)"
+                else -> "$targetCode.$memberName"
+            }
+            is SetType -> when (memberName) {
+                "size" -> "len($targetCode)"
+                else -> "$targetCode.$memberName"
+            }
+            is MapType -> when (memberName) {
+                "size" -> "len($targetCode)"
+                "keys" -> "$targetCode.keys()"
+                "values" -> "$targetCode.values()"
+                else -> "$targetCode.$memberName"
+            }
+            else -> "$targetCode.$memberName"
+        }
     }
 
     fun visitMethodCall(node: MethodCall): String {
-        // TODO - handle method calls for different types of objects
-        println(node)
-        return ""
+        val targetType = typeOf(node.target)
+        val methodName = node.method.value
+        val targetCode = visit(node.target)
+        val argsCode = node.arguments.joinToString(", ") { visit(it) }
+
+        return when (targetType) {
+            is ListType -> when (methodName) {
+                "add" -> "$targetCode.append($argsCode)"
+                "addAt" -> "$targetCode.insert($argsCode)"
+                "addAll" -> "$targetCode.extend($argsCode)"
+                "remove" -> "$targetCode.remove($argsCode)"
+                "removeAt" -> "$targetCode.pop($argsCode)"
+                "clear" -> "$targetCode.clear()"
+                "count" -> "$targetCode.count($argsCode)"
+                else -> "$targetCode.$methodName($argsCode)"
+            }
+            is SetType -> when (methodName) {
+                "add" -> "$targetCode.add($argsCode)"
+                "remove" -> "$targetCode.remove($argsCode)"
+                "clear" -> "$targetCode.clear()"
+                else -> "$targetCode.$methodName($argsCode)"
+            }
+            is MapType -> when (methodName) {
+                "get" -> "$targetCode.get($argsCode)"
+                "remove" -> "$targetCode.pop($argsCode)"
+                "clear" -> "$targetCode.clear()"
+                else -> "$targetCode.$methodName($argsCode)"
+            }
+            else -> "$targetCode.$methodName($argsCode)"
+        }
     }
 
     fun visitFunctionCall(node: FunctionCall): String {
@@ -240,6 +302,8 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitVarDecl(node: VarDecl): String {
+        val type = typeOf(node.expr)
+        symbolTable.define(node.left.value!!, type!!)
         return "${node.left.value} = ${visit(node.expr)}"
     }
 
@@ -253,6 +317,7 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitInputStatement(node: InputStatement): String {
+        symbolTable.define(node.variable.value!!, node.type)
         return "${visit(node.variable)} = ${visit(node.type)}(input())"
     }
 
@@ -334,13 +399,18 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitFunParameter(node: FunParameter): String {
+        symbolTable.define(node.variable.value!!, node.type)
         return "${visit(node.variable)}: ${visit(node.type)}"
     }
 
     fun visitFunStatement(node: FunStatement) {
+        symbolTable.define(node.name.value!!, node.returnType)
         var result = ""
         repeat(indent) { result += '\t' }
         result += "def ${node.name.value}("
+
+        symbolTable.enterScope()
+
         for (i in node.parameters.indices) {
             result += visit(node.parameters[i])
             if (i != node.parameters.size - 1)
@@ -352,6 +422,8 @@ class PythonTranspiler(val statements: List<Statement>) {
         indent++
         executeLines(node.exeStatement.lines)
         indent--
+
+        symbolTable.exitScope()
     }
 
     fun visitReturnStatement(node: ReturnStatement): String {
@@ -424,6 +496,7 @@ class PythonTranspiler(val statements: List<Statement>) {
             if (result != "")
                 program.add(result)
         }
+
         return program
     }
 }

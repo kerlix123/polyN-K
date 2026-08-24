@@ -1,12 +1,6 @@
-- fun twoSum(list[int] nums, int target): list[int] [A1 & A2];
-
-    A1 var seen = map[int, int]();
-
-    A2 for (i from 0 to nums.size-1) [A3 & A4 & A6];
-        A3 var diff = target - nums[i];
-        A4 if (diff in seen) [A5];
-            A5 return list[int](seen[diff], i);
-        A6 seen[nums[i]] = i;
-
-- var a = twoSum(list[int](2, 7, 11, 15), 9);
+- var a = map[string, int]("lele" to 1, "jovan" to 3);
+- println(a.keys);
+- println(a.values);
+- a.remove("lele");
+- a.clear();
 - println(a);

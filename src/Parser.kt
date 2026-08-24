@@ -103,6 +103,8 @@ class Parser(val tokens: List<Token>) {
     }
 
     private fun parameterList(): List<FunParameter> {
+        if (currentToken.type == TokenType.RPAREN)
+            return emptyList()
         val parameters = mutableListOf(funParameter())
 
         while (currentToken.type == TokenType.COMMA) {
