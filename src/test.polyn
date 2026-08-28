@@ -1,6 +1,0 @@
-- var a = map[string, int]("lele" to 1, "jovan" to 3);
-- println(a.keys);
-- println(a.values);
-- a.remove("lele");
-- a.clear();
-- println(a);

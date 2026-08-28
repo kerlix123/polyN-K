@@ -260,7 +260,16 @@ class PythonTranspiler(val statements: List<Statement>) {
                 "clear" -> "$targetCode.clear()"
                 else -> "$targetCode.$methodName($argsCode)"
             }
-            else -> "$targetCode.$methodName($argsCode)"
+            is ScalarType -> when (methodName) {
+                "toInt" -> "int($targetCode)"
+                "toFloat" -> "float($targetCode)"
+                "toString" -> "str($targetCode)"
+                "toBool" -> "bool($targetCode)"
+                else -> "$targetCode.$methodName($argsCode)"
+            }
+            else -> {
+                "$targetCode.$methodName($argsCode)"
+            }
         }
     }
 
@@ -313,7 +322,11 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun visitPrintStatement(node: PrintStatement): String {
-        return "print(${visit(node.expr)})"
+        if (node.token.type == TokenType.PRINTLN) {
+            return "print(${visit(node.expr)})"
+        } else {
+            return "print(${visit(node.expr)}, end = '')"
+        }
     }
 
     fun visitInputStatement(node: InputStatement): String {
