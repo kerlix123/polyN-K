@@ -34,7 +34,11 @@ class Lexer(private val text: String) {
         "continue" to Token(TokenType.CONTINUE),
         "class" to Token(TokenType.CLASS),
         "fun" to Token(TokenType.FUN),
-        "return" to Token(TokenType.RETURN)
+        "return" to Token(TokenType.RETURN),
+        "native" to Token(TokenType.NATIVE),
+        "python" to Token(TokenType.PYTHON),
+        "kotlin" to Token(TokenType.KOTLIN),
+        "cpp" to Token(TokenType.CPP)
     )
 
     private fun error(msg: String = "Invalid character: $currentChar"): Nothing {
@@ -187,6 +191,30 @@ class Lexer(private val text: String) {
         return tokens
     }
 
+    private fun makeNativeCode(): List<Token> {
+        val tokens = mutableListOf<Token>()
+        advance() // consume {
+        val lastTwo = mutableListOf<Char?>(null, null)
+        var code = ""
+
+        while (currentChar != null && currentChar != '\r' && currentChar != '\n') {
+            code += currentChar
+            lastTwo[0] = lastTwo[1]
+            lastTwo[1] = currentChar
+            advance()
+        }
+
+        tokens.add(Token(TokenType.NATIVE_CODE, code.dropLast(2)))
+
+        if (lastTwo[0] == '}' && lastTwo[1] == ';') {
+            tokens.add(Token(TokenType.SEMI))
+        } else {
+            error("Expected }; at the end of a native statement.")
+        }
+
+        return tokens
+    }
+
     private fun makeNextToken(): List<Token> {
         val tokens = mutableListOf<Token>()
 
@@ -198,6 +226,8 @@ class Lexer(private val text: String) {
             tokens.add(makeKeywordOrID())
         } else if (currentChar == '"') {
             tokens.addAll(makeString())
+        } else if (currentChar == '{') {
+            tokens.addAll(makeNativeCode())
         } else if (currentChar == '+') {
             advance()
             tokens.add(Token(if (match('=')) TokenType.PLUS_ASSIGN else TokenType.PLUS))

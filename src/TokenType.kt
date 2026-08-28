@@ -1,4 +1,12 @@
 enum class TokenType {
+    NATIVE,
+    PYTHON,
+    KOTLIN,
+    CPP,
+    LBRACE,
+    RBRACE,
+    NATIVE_CODE,
+
     ID,
     EOF,
 

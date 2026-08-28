@@ -38,8 +38,11 @@ data class FunParameter(val type: Type, val variable: Var): AST
 data class FunStatement(val name: Var, val parameters: List<FunParameter>, val returnType: Type, val exeStatement: ExeStatement): AST
 data class ReturnStatement(val value: AST): AST
 data class ExpressionStatement(val expr: AST) : AST
+data class NativeStatement(val target: Token, val statement: String): AST
 data object NoOp: AST
 data class Statement(val lineName: Token, val statement: AST): AST
+
+val languageTokenTypes = setOf(TokenType.PYTHON, TokenType.KOTLIN, TokenType.CPP)
 
 class Parser(val tokens: List<Token>) {
     var pos = 0
@@ -647,6 +650,19 @@ class Parser(val tokens: List<Token>) {
         return ReturnStatement(value)
     }
 
+    private fun nativeStatement(): NativeStatement {
+        eat(TokenType.NATIVE)
+        eat(TokenType.LBRACKET)
+        val target = currentToken
+        if (currentToken.type in languageTokenTypes) {
+            eat(currentToken.type)
+        }
+        eat(TokenType.RBRACKET)
+        val nativeCode = currentToken.value ?: ""
+        eat(TokenType.NATIVE_CODE)
+        return NativeStatement(target, nativeCode)
+    }
+
     private fun empty(): NoOp {
         return NoOp
     }
@@ -672,6 +688,7 @@ class Parser(val tokens: List<Token>) {
             TokenType.FOR -> forStatement()
             TokenType.FUN -> funStatement()
             TokenType.RETURN -> returnStatement()
+            TokenType.NATIVE -> nativeStatement()
             else -> expressionOrAssignmentStatement()
         }
 

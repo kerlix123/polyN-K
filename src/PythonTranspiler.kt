@@ -114,6 +114,7 @@ class PythonTranspiler(val statements: List<Statement>) {
             is FunStatement -> visitFunStatement(node)
             is ReturnStatement -> return visitReturnStatement(node)
             is ExpressionStatement -> return visitExpressionStatement(node)
+            is NativeStatement -> return visitNativeStatement(node)
         }
         return ""
     }
@@ -447,6 +448,14 @@ class PythonTranspiler(val statements: List<Statement>) {
         return visit(node.expr)
     }
 
+    fun visitNativeStatement(node: NativeStatement): String {
+        if (node.target.type == TokenType.PYTHON) {
+            return node.statement
+        } else {
+            return ""
+        }
+    }
+
     fun visitNoOp(): String {
         return ""
     }
@@ -497,10 +506,17 @@ class PythonTranspiler(val statements: List<Statement>) {
     }
 
     fun transpile(): List<String> {
-        for ((lineName, statement1) in statements) {
+        for ((lineName, statement) in statements) {
             if (lineName.type == TokenType.ID) {
+                if (statement is NativeStatement) {
+                    val name = lineName.value!!
+                    if (statement.target.type == TokenType.PYTHON) {
+                        lineNames[name] = statement
+                    }
+                    continue
+                }
                 val name = lineName.value!!
-                lineNames[name] = statement1
+                lineNames[name] = statement
             }
         }
 
